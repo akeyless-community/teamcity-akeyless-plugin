@@ -1,0 +1,164 @@
+plugins {
+    id 'java'
+    id 'org.jetbrains.kotlin.jvm' version '1.9.24'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+    // Allow using any Java version for compilation, but target Java 11 bytecode
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21) // Use Java 21 runtime
+    }
+}
+
+group = 'com.akeyless'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+    maven {
+        url = 'https://download.jetbrains.com/teamcity-repository'
+    }
+    maven {
+        url = 'https://akeyless.jfrog.io/artifactory/akeyless-java'
+    }
+}
+
+configurations {
+    serverCompileOnly
+    agentCompileOnly
+    // Create resolvable configurations that extend the compileOnly ones
+    serverCompileClasspath {
+        canBeResolved = true
+        canBeConsumed = false
+        extendsFrom(serverCompileOnly)
+    }
+    agentCompileClasspath {
+        canBeResolved = true
+        canBeConsumed = false
+        extendsFrom(agentCompileOnly)
+    }
+}
+
+dependencies {
+    // Common dependencies (used by all sourceSets)
+    implementation('io.akeyless:akeyless-java:5.0.21')
+    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24')
+    
+    // Server dependencies - compileOnly means available at compile time, provided at runtime
+    serverCompileOnly('org.jetbrains.teamcity:server-api:2024.12') {
+        exclude group: 'com.ibm.icu', module: 'icu4j'
+    }
+    serverCompileOnly('org.jetbrains.teamcity:common-api:2024.12') {
+        exclude group: 'com.ibm.icu', module: 'icu4j'
+    }
+    serverCompileOnly('org.jetbrains.teamcity:oauth:2024.12') {
+        exclude group: 'com.ibm.icu', module: 'icu4j'
+    }
+    serverCompileOnly('org.jetbrains.teamcity:server-web-api:2024.12') {
+        exclude group: 'com.ibm.icu', module: 'icu4j'
+    }
+    
+    // Agent dependencies - compileOnly means available at compile time, provided at runtime
+    agentCompileOnly('org.jetbrains.teamcity:agent-api:2024.12') {
+        exclude group: 'com.ibm.icu', module: 'icu4j'
+    }
+    agentCompileOnly('org.jetbrains.teamcity:common-api:2024.12') {
+        exclude group: 'com.ibm.icu', module: 'icu4j'
+    }
+    
+    // Test dependencies
+    testImplementation('junit:junit:4.13.2')
+    testImplementation('org.jetbrains.kotlin:kotlin-test-junit:1.9.24')
+}
+
+sourceSets {
+    common {
+        kotlin {
+            srcDirs = ['common/src/main/kotlin']
+        }
+    }
+    server {
+        kotlin {
+            srcDirs = ['server/src/main/kotlin']
+        }
+        resources {
+            srcDirs = ['server/src/main/resources']
+        }
+        compileClasspath += sourceSets.common.output
+        compileClasspath += configurations.serverCompileClasspath
+        compileClasspath += sourceSets.common.compileClasspath
+        compileClasspath += configurations.compileClasspath
+        runtimeClasspath += sourceSets.common.output
+        runtimeClasspath += sourceSets.common.runtimeClasspath
+        runtimeClasspath += configurations.runtimeClasspath
+    }
+    agent {
+        kotlin {
+            srcDirs = ['agent/src/main/kotlin']
+        }
+        resources {
+            srcDirs = ['agent/src/main/resources']
+        }
+        compileClasspath += sourceSets.common.output
+        compileClasspath += configurations.agentCompileClasspath
+        compileClasspath += sourceSets.common.compileClasspath
+        compileClasspath += configurations.compileClasspath
+        runtimeClasspath += sourceSets.common.output
+        runtimeClasspath += sourceSets.common.runtimeClasspath
+        runtimeClasspath += configurations.runtimeClasspath
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = '11'  // Target Java 11 bytecode
+        freeCompilerArgs = ['-Xjvm-default=all']
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    sourceCompatibility = '11'
+    targetCompatibility = '11'
+    options.release = 11
+}
+
+task serverJar(type: Jar) {
+    archiveBaseName.set('akeyless-server')
+    from sourceSets.server.output
+    from sourceSets.common.output
+    dependsOn classes
+}
+
+task agentZip(type: Zip) {
+    archiveBaseName.set('akeyless-agent')
+    from sourceSets.agent.output
+    from sourceSets.common.output
+    dependsOn classes
+}
+
+task pluginZip(type: Zip) {
+    archiveBaseName.set('akeyless-teamcity-plugin')
+    archiveVersion.set(project.version)
+    
+    into('server') {
+        from serverJar
+        from(configurations.runtimeClasspath) {
+            exclude '**/kotlin-stdlib*'
+            exclude '**/annotations*'
+        }
+    }
+    
+    into('agent') {
+        from agentZip
+    }
+    
+    into('.') {
+        from('teamcity-plugin.xml')
+    }
+    
+    dependsOn serverJar, agentZip
+}
+
+build.dependsOn pluginZip
