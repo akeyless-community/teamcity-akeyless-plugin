@@ -10,6 +10,7 @@ import io.akeyless.client.model.DescribeItem
 import io.akeyless.client.model.GetDynamicSecretValue
 import io.akeyless.client.model.GetRotatedSecretValue
 import io.akeyless.client.model.GetSecretValue
+import io.akeyless.cloudid.CloudProviderFactory
 import jetbrains.buildServer.log.Loggers
 
 class AkeylessConnector(
@@ -40,18 +41,17 @@ class AkeylessConnector(
                     authConfig["accessId"]?.let { auth.accessId(it) }
                     authConfig["k8sAuthConfigName"]?.let { auth.k8sAuthConfigName(it) }
                 }
-                AkeylessConstants.AUTH_METHOD_AWS_IAM -> {
-                    authConfig["accessId"]?.let { auth.accessId(it) }
-                    val cloudId = AwsCloudIdProvider.getCloudId()
-                    logger.info("Akeyless: generated AWS cloud-id (length=${cloudId.length})")
-                    auth.cloudId(cloudId)
-                }
-                AkeylessConstants.AUTH_METHOD_AZURE_AD -> {
-                    authConfig["accessId"]?.let { auth.accessId(it) }
-                }
+                AkeylessConstants.AUTH_METHOD_AWS_IAM,
+                AkeylessConstants.AUTH_METHOD_AZURE_AD,
                 AkeylessConstants.AUTH_METHOD_GCP -> {
                     authConfig["accessId"]?.let { auth.accessId(it) }
-                    auth.gcpAudience("akeyless.io")
+                    if (authMethod == AkeylessConstants.AUTH_METHOD_GCP) {
+                        auth.gcpAudience("akeyless.io")
+                    }
+                    val provider = CloudProviderFactory.getCloudIdProvider(authMethod)
+                    val cloudId = provider.cloudId
+                    logger.info("Akeyless: generated $authMethod cloud-id (length=${cloudId.length})")
+                    auth.cloudId(cloudId)
                 }
                 AkeylessConstants.AUTH_METHOD_CERT -> {
                     authConfig["accessId"]?.let { auth.accessId(it) }
