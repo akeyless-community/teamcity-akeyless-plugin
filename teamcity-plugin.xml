@@ -8,10 +8,10 @@
         <description>
             Integrate Akeyless secrets management platform with TeamCity.
             Retrieve secrets from Akeyless during builds without storing sensitive data in TeamCity.
-            
+
             Features:
             - Secure secret retrieval from Akeyless
-            - Support for multiple authentication methods (Access Key, SAML, LDAP, etc.)
+            - Support for multiple authentication methods (Access Key, Kubernetes, AWS IAM, Azure AD, GCP, Certificate)
             - Remote parameters support
             - Automatic token management
             - Support for static secrets, dynamic secrets, and rotated secrets
@@ -23,14 +23,26 @@
         </vendor>
         <download-url>https://github.com/akeyless/teamcity-akeyless-plugin</download-url>
     </info>
-    
-    <deployment use-separate-classloader="true">
-        <include name="server/**"/>
-        <include name="agent/**"/>
-    </deployment>
-    
+
+    <requirements min-build="152113" />
+
+    <deployment use-separate-classloader="true" allow-runtime-reload="true" />
+
     <parameters>
         <parameter name="akeyless.api.url" value="https://api.akeyless.io"/>
         <parameter name="akeyless.auth.method" value="access_key"/>
     </parameters>
+
+    <change-notes>
+        <![CDATA[
+        <b>1.0.0</b>
+        <ul>
+            <li>Initial release</li>
+            <li>Support for static, dynamic, and rotated secrets</li>
+            <li>Authentication methods: Access Key, Kubernetes, AWS IAM, Azure AD, GCP, Certificate</li>
+            <li>Remote parameter support with akeyless: prefix</li>
+            <li>OAuth-based connection management</li>
+        </ul>
+        ]]>
+    </change-notes>
 </teamcity-plugin>

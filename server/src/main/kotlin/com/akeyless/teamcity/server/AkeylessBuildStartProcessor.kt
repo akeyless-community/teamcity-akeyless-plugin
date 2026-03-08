@@ -11,6 +11,10 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor {
 
     private val logger = Loggers.SERVER
 
+    companion object {
+        private const val AKEYLESS_PREFIX = "akeyless:"
+    }
+
     override fun updateParameters(context: BuildStartContext) {
         val build = context.build
         val buildType = build.buildType ?: return
@@ -30,7 +34,7 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor {
         allParams.putAll(context.sharedParameters)
         allParams.putAll(build.buildOwnParameters)
 
-        val akeylessRefs = allParams.filter { it.value.startsWith("akeyless:") }
+        val akeylessRefs = allParams.filter { it.value.startsWith(AKEYLESS_PREFIX) }
         if (akeylessRefs.isEmpty()) return
 
         logger.info("Akeyless: resolving ${akeylessRefs.size} secret references for build ${build.buildId}")
@@ -55,45 +59,38 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor {
         logger.info("Akeyless: authenticated successfully, resolving secrets")
 
         akeylessRefs.forEach { (paramName, paramValue) ->
-            val secretPath = paramValue.substringAfter("akeyless:")
+            val secretPath = paramValue.substringAfter(AKEYLESS_PREFIX)
+            if (secretPath.isBlank()) {
+                logger.warn("Akeyless: empty secret path for parameter '$paramName'")
+                return@forEach
+            }
             try {
                 val secretValue = connector.resolveSecret(secretPath, token)
                 if (secretValue != null) {
                     context.addSharedParameter(paramName, secretValue)
                     logger.info("Akeyless: resolved secret for parameter '$paramName'")
                 } else {
-                    logger.warn("Akeyless: failed to retrieve secret '$secretPath' for parameter '$paramName'")
+                    logger.warn("Akeyless: failed to retrieve secret for parameter '$paramName'")
                 }
             } catch (e: Exception) {
-                logger.error("Akeyless: error resolving secret '$secretPath' for parameter '$paramName'", e)
+                logger.error("Akeyless: error resolving secret for parameter '$paramName'", e)
             }
         }
     }
 
     private fun extractAuthConfig(properties: Map<String, String>, authMethod: String): Map<String, String> {
         val authConfig = mutableMapOf<String, String>()
+        properties["accessId"]?.let { authConfig["accessId"] = it }
+
         when (authMethod) {
             AkeylessConstants.AUTH_METHOD_ACCESS_KEY -> {
-                properties["accessId"]?.let { authConfig["accessId"] = it }
                 properties["accessKey"]?.let { authConfig["accessKey"] = it }
             }
             AkeylessConstants.AUTH_METHOD_K8S -> {
-                properties["accessId"]?.let { authConfig["accessId"] = it }
                 properties["k8sAuthConfigName"]?.let { authConfig["k8sAuthConfigName"] = it }
             }
-            AkeylessConstants.AUTH_METHOD_AWS_IAM -> {
-                properties["accessId"]?.let { authConfig["accessId"] = it }
-            }
-            AkeylessConstants.AUTH_METHOD_AZURE_AD -> {
-                properties["accessId"]?.let { authConfig["accessId"] = it }
-            }
-            AkeylessConstants.AUTH_METHOD_GCP -> {
-                properties["accessId"]?.let { authConfig["accessId"] = it }
-            }
             AkeylessConstants.AUTH_METHOD_CERT -> {
-                properties["accessId"]?.let { authConfig["accessId"] = it }
                 properties["certData"]?.let { authConfig["certData"] = it }
-                properties["certFile"]?.let { authConfig["certFile"] = it }
             }
         }
         return authConfig

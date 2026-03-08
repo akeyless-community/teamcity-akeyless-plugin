@@ -38,7 +38,6 @@ class AkeylessOAuthProvider(
     override fun getPropertiesProcessor(): PropertiesProcessor {
         return object : PropertiesProcessor {
             override fun process(properties: MutableMap<String, String>): Collection<InvalidProperty> {
-                logger.info("AkeylessOAuthProvider.process called with ${properties.size} keys: ${properties.keys}")
                 val errors = ArrayList<InvalidProperty>()
 
                 if (properties["displayName"].isNullOrBlank()) {
@@ -89,10 +88,12 @@ class AkeylessOAuthProvider(
                         if (properties["accessId"].isNullOrBlank()) {
                             errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
                         }
+                        if (properties["certData"].isNullOrBlank() && properties["certFile"].isNullOrBlank()) {
+                            errors.add(InvalidProperty("certData", "Either Certificate Data or Certificate File Path must be provided"))
+                        }
                     }
                 }
 
-                logger.info("AkeylessOAuthProvider.process returning ${errors.size} errors, remaining keys: ${properties.keys}")
                 return errors
             }
 
