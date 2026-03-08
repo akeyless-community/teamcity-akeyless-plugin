@@ -32,7 +32,7 @@ This plugin integrates [Akeyless Secrets Management Platform](https://www.akeyle
    ./gradlew build
    ```
 
-3. The plugin ZIP file will be created at `build/distributions/akeyless-teamcity-plugin-1.0.0.zip`
+3. The plugin ZIP file will be created at `build/distributions/akeyless-teamcity-plugin-<version>.zip`
 
 4. Install the plugin in TeamCity:
    - Go to **Administration** > **Plugins**
