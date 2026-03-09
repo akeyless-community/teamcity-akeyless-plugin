@@ -11,6 +11,8 @@ class AkeylessParameterProvider : AbstractBuildParametersProvider() {
     private val logger = Loggers.SERVER
 
     companion object {
+        private const val AKEYLESS_PREFIX = "akeyless:"
+
         fun isFeatureEnabled(build: SBuild): Boolean {
             val buildType = build.buildType ?: return false
             val project = buildType.project
@@ -21,7 +23,7 @@ class AkeylessParameterProvider : AbstractBuildParametersProvider() {
     }
 
     override fun getParametersAvailableOnAgent(build: SBuild): Collection<String> {
-        val buildType = build.buildType ?: return emptyList()
+        build.buildType ?: return emptyList()
         if (build.isFinished) return emptyList()
         if (!isFeatureEnabled(build)) return emptyList()
 
@@ -29,7 +31,7 @@ class AkeylessParameterProvider : AbstractBuildParametersProvider() {
         val parameters = build.buildOwnParameters
 
         parameters.forEach { (paramName, paramValue) ->
-            if (paramValue.startsWith("akeyless:")) {
+            if (paramValue.startsWith(AKEYLESS_PREFIX)) {
                 exposed.add(paramName)
             }
         }

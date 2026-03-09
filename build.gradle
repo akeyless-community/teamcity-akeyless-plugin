@@ -12,7 +12,7 @@ java {
 }
 
 group = 'com.akeyless'
-version = '1.0.0'
+version = '1.0.2'
 
 repositories {
     mavenCentral()
@@ -156,6 +156,11 @@ task pluginZip(type: Zip) {
     
     into('.') {
         from('teamcity-plugin.xml')
+    }
+
+    into('META-INF') {
+        from('server/src/main/resources/META-INF/pluginIcon.svg')
+        from('server/src/main/resources/META-INF/pluginIcon_dark.svg')
     }
     
     dependsOn serverJar, agentZip

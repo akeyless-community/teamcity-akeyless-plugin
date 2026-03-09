@@ -1,6 +1,6 @@
 package com.akeyless.teamcity.server
 
-import com.akeyless.teamcity.common.*
+import com.akeyless.teamcity.common.AkeylessConstants
 import io.akeyless.client.ApiClient
 import io.akeyless.client.ApiException
 import io.akeyless.client.Configuration
@@ -12,6 +12,7 @@ import io.akeyless.client.model.GetRotatedSecretValue
 import io.akeyless.client.model.GetSecretValue
 import io.akeyless.cloudid.CloudProviderFactory
 import jetbrains.buildServer.log.Loggers
+import java.net.URI
 
 class AkeylessConnector(
     private val apiUrl: String,
@@ -22,6 +23,7 @@ class AkeylessConnector(
     private val api: V2Api
 
     init {
+        validateApiUrl(apiUrl)
         val client: ApiClient = Configuration.getDefaultApiClient()
         client.basePath = apiUrl.trimEnd('/')
         api = V2Api(client)
@@ -50,7 +52,7 @@ class AkeylessConnector(
                     }
                     val provider = CloudProviderFactory.getCloudIdProvider(authMethod)
                     val cloudId = provider.cloudId
-                    logger.info("Akeyless: generated $authMethod cloud-id (length=${cloudId.length})")
+                    logger.debug("Akeyless: generated $authMethod cloud-id")
                     auth.cloudId(cloudId)
                 }
                 AkeylessConstants.AUTH_METHOD_CERT -> {
@@ -70,7 +72,7 @@ class AkeylessConnector(
             logger.info("Successfully authenticated with Akeyless")
             return token
         } catch (e: ApiException) {
-            logger.error("Akeyless authentication failed: code=${e.code}, body=${e.responseBody}", e)
+            logger.error("Akeyless authentication failed: code=${e.code}", e)
             return null
         } catch (e: Exception) {
             logger.error("Error authenticating with Akeyless", e)
@@ -79,8 +81,9 @@ class AkeylessConnector(
     }
 
     fun resolveSecret(secretName: String, token: String): String? {
+        validateSecretPath(secretName)
         val itemType = describeItemType(secretName, token)
-        logger.info("Akeyless: item '$secretName' type=$itemType")
+        logger.debug("Akeyless: item '$secretName' type=$itemType")
 
         return when {
             itemType.equals("DYNAMIC_SECRET", ignoreCase = true) -> getDynamicSecretValue(secretName, token)
@@ -96,13 +99,12 @@ class AkeylessConnector(
             body.token(token)
 
             val result = api.describeItem(body)
-            val itemType = result.itemType ?: "STATIC_SECRET"
-            return itemType
+            return result.itemType ?: "STATIC_SECRET"
         } catch (e: ApiException) {
-            logger.warn("Akeyless: could not describe item '$secretName' (code=${e.code}), defaulting to static secret")
+            logger.warn("Akeyless: could not describe item (code=${e.code}), defaulting to static secret")
             return "STATIC_SECRET"
         } catch (e: Exception) {
-            logger.warn("Akeyless: error describing item '$secretName', defaulting to static secret", e)
+            logger.warn("Akeyless: error describing item, defaulting to static secret", e)
             return "STATIC_SECRET"
         }
     }
@@ -113,23 +115,21 @@ class AkeylessConnector(
             body.names(listOf(secretName))
             body.token(token)
 
-            logger.info("Akeyless: fetching static secret '$secretName'")
+            logger.debug("Akeyless: fetching static secret")
             val result = api.getSecretValue(body)
 
             val rawValue = result[secretName] ?: result[secretName.trimStart('/')]
             if (rawValue != null) {
-                val secretValue = rawValue.toString()
-                logger.info("Akeyless: resolved static secret '$secretName' (length=${secretValue.length})")
-                return secretValue
+                return rawValue.toString()
             }
 
-            logger.warn("Akeyless: static secret '$secretName' not found in response keys: ${result.keys}")
+            logger.warn("Akeyless: static secret not found in response")
             return null
         } catch (e: ApiException) {
-            logger.error("Akeyless API error getting static secret '$secretName': code=${e.code}, body=${e.responseBody}", e)
+            logger.error("Akeyless API error getting static secret: code=${e.code}", e)
             return null
         } catch (e: Exception) {
-            logger.error("Error getting static secret '$secretName'", e)
+            logger.error("Error getting static secret", e)
             return null
         }
     }
@@ -140,22 +140,20 @@ class AkeylessConnector(
             body.name(secretName)
             body.token(token)
 
-            logger.info("Akeyless: fetching dynamic secret '$secretName'")
+            logger.debug("Akeyless: fetching dynamic secret")
             val result = api.getDynamicSecretValue(body)
 
             if (result != null) {
-                val secretValue = result.toString()
-                logger.info("Akeyless: resolved dynamic secret '$secretName' (length=${secretValue.length})")
-                return secretValue
+                return result.toString()
             }
 
-            logger.warn("Akeyless: dynamic secret '$secretName' returned null")
+            logger.warn("Akeyless: dynamic secret returned null")
             return null
         } catch (e: ApiException) {
-            logger.error("Akeyless API error getting dynamic secret '$secretName': code=${e.code}, body=${e.responseBody}", e)
+            logger.error("Akeyless API error getting dynamic secret: code=${e.code}", e)
             return null
         } catch (e: Exception) {
-            logger.error("Error getting dynamic secret '$secretName'", e)
+            logger.error("Error getting dynamic secret", e)
             return null
         }
     }
@@ -166,30 +164,57 @@ class AkeylessConnector(
             body.names(secretName)
             body.token(token)
 
-            logger.info("Akeyless: fetching rotated secret '$secretName'")
+            logger.debug("Akeyless: fetching rotated secret")
             val result = api.getRotatedSecretValue(body)
 
             if (result != null) {
                 val value = result["value"] ?: result[secretName] ?: result[secretName.trimStart('/')]
                 if (value != null) {
-                    val secretValue = value.toString()
-                    logger.info("Akeyless: resolved rotated secret '$secretName' (length=${secretValue.length})")
-                    return secretValue
+                    return value.toString()
                 }
-                // If specific key not found, return the whole response as JSON
-                val secretValue = result.toString()
-                logger.info("Akeyless: resolved rotated secret '$secretName' as full response (length=${secretValue.length})")
-                return secretValue
+                return result.toString()
             }
 
-            logger.warn("Akeyless: rotated secret '$secretName' returned null")
+            logger.warn("Akeyless: rotated secret returned null")
             return null
         } catch (e: ApiException) {
-            logger.error("Akeyless API error getting rotated secret '$secretName': code=${e.code}, body=${e.responseBody}", e)
+            logger.error("Akeyless API error getting rotated secret: code=${e.code}", e)
             return null
         } catch (e: Exception) {
-            logger.error("Error getting rotated secret '$secretName'", e)
+            logger.error("Error getting rotated secret", e)
             return null
+        }
+    }
+
+    companion object {
+        fun validateApiUrl(url: String) {
+            val trimmed = url.trimEnd('/')
+            val uri = try {
+                URI(trimmed)
+            } catch (e: Exception) {
+                throw IllegalArgumentException("Invalid API URL: $trimmed")
+            }
+            require(uri.scheme == "https" || uri.scheme == "http") {
+                "API URL must use https (or http for development): $trimmed"
+            }
+            require(!uri.host.isNullOrBlank()) {
+                "API URL must have a valid host: $trimmed"
+            }
+            val host = uri.host.lowercase()
+            require(host != "localhost" || uri.scheme == "http") {
+                "Use http scheme for localhost URLs"
+            }
+            require(!host.startsWith("127.") && !host.startsWith("10.") &&
+                    !host.startsWith("192.168.") && host != "0.0.0.0" &&
+                    host != "[::1]") {
+                "API URL must not point to private/loopback addresses: $trimmed"
+            }
+        }
+
+        fun validateSecretPath(path: String) {
+            require(path.isNotBlank()) { "Secret path must not be blank" }
+            require(!path.contains("..")) { "Secret path must not contain path traversal (..)" }
+            require(path.all { it.code >= 0x20 }) { "Secret path must not contain control characters" }
         }
     }
 }
