@@ -4,7 +4,7 @@
     <info>
         <name>Akeyless Secrets Management</name>
         <display-name>Akeyless Secrets Management</display-name>
-        <version>1.0.2</version>
+        <version>1.0.3</version>
         <description>
             Integrate Akeyless secrets management platform with TeamCity.
             Retrieve secrets from Akeyless during builds without storing sensitive data in TeamCity.
@@ -35,6 +35,10 @@
 
     <change-notes>
         <![CDATA[
+        <b>1.0.3</b>
+        <ul>
+            <li>Security: mask Akeyless secrets in build logs and UI via PasswordsProvider</li>
+        </ul>
         <b>1.0.2</b>
         <ul>
             <li>Fix plugin icon to be included in ZIP for Marketplace detection</li>

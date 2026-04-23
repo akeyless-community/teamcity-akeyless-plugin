@@ -4,12 +4,20 @@ import com.akeyless.teamcity.common.AkeylessConstants
 import jetbrains.buildServer.log.Loggers
 import jetbrains.buildServer.serverSide.BuildStartContext
 import jetbrains.buildServer.serverSide.BuildStartContextProcessor
+import jetbrains.buildServer.serverSide.Parameter
+import jetbrains.buildServer.serverSide.SBuild
 import jetbrains.buildServer.serverSide.SRunningBuild
+import jetbrains.buildServer.serverSide.SimpleParameter
 import jetbrains.buildServer.serverSide.oauth.OAuthConstants
+import jetbrains.buildServer.serverSide.parameters.types.PasswordsProvider
+import java.util.concurrent.ConcurrentHashMap
 
-class AkeylessBuildStartProcessor : BuildStartContextProcessor {
+class AkeylessBuildStartProcessor : BuildStartContextProcessor, PasswordsProvider {
 
     private val logger = Loggers.SERVER
+
+    // Track resolved secrets per build so PasswordsProvider can report them for masking
+    private val resolvedSecrets = ConcurrentHashMap<Long, MutableList<Parameter>>()
 
     companion object {
         private const val AKEYLESS_PREFIX = "akeyless:"
@@ -58,6 +66,8 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor {
 
         logger.info("Akeyless: authenticated successfully, resolving secrets")
 
+        val passwordParams = mutableListOf<Parameter>()
+
         akeylessRefs.forEach { (paramName, paramValue) ->
             val secretPath = paramValue.substringAfter(AKEYLESS_PREFIX)
             if (secretPath.isBlank()) {
@@ -68,6 +78,7 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor {
                 val secretValue = connector.resolveSecret(secretPath, token)
                 if (secretValue != null) {
                     context.addSharedParameter(paramName, secretValue)
+                    passwordParams.add(SimpleParameter(paramName, secretValue))
                     logger.info("Akeyless: resolved secret for parameter '$paramName'")
                 } else {
                     logger.warn("Akeyless: failed to retrieve secret for parameter '$paramName'")
@@ -76,6 +87,14 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor {
                 logger.error("Akeyless: error resolving secret for parameter '$paramName'", e)
             }
         }
+
+        if (passwordParams.isNotEmpty()) {
+            resolvedSecrets[build.buildId] = passwordParams
+        }
+    }
+
+    override fun getPasswordParameters(build: SBuild): Collection<Parameter> {
+        return resolvedSecrets.remove(build.buildId) ?: emptyList()
     }
 
     private fun extractAuthConfig(properties: Map<String, String>, authMethod: String): Map<String, String> {
