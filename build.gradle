@@ -12,7 +12,7 @@ java {
 }
 
 group = 'com.akeyless'
-version = '1.0.3'
+version = '1.0.4'
 
 repositories {
     mavenCentral()
@@ -131,11 +131,19 @@ task serverJar(type: Jar) {
     dependsOn classes
 }
 
-task agentZip(type: Zip) {
+task agentJar(type: Jar) {
     archiveBaseName.set('akeyless-agent')
     from sourceSets.agent.output
     from sourceSets.common.output
     dependsOn classes
+}
+
+task agentZip(type: Zip) {
+    archiveBaseName.set('akeyless-agent')
+    into('lib') {
+        from agentJar
+    }
+    dependsOn agentJar
 }
 
 task pluginZip(type: Zip) {

@@ -90,6 +90,8 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor, PasswordsProvide
 
         if (passwordParams.isNotEmpty()) {
             resolvedSecrets[build.buildId] = passwordParams
+            val resolvedNames = passwordParams.map { it.name }.joinToString(",")
+            context.addSharedParameter(AkeylessConstants.RESOLVED_PARAMS_KEY, resolvedNames)
         }
     }
 
