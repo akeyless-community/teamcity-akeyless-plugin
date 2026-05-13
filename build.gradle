@@ -12,7 +12,7 @@ java {
 }
 
 group = 'com.akeyless'
-version = '1.0.4'
+version = '1.1.0'
 
 repositories {
     mavenCentral()
@@ -108,6 +108,18 @@ sourceSets {
         runtimeClasspath += sourceSets.common.output
         runtimeClasspath += sourceSets.common.runtimeClasspath
         runtimeClasspath += configurations.runtimeClasspath
+    }
+    test {
+        compileClasspath += sourceSets.common.output
+        compileClasspath += sourceSets.server.output
+        compileClasspath += configurations.serverCompileClasspath
+        compileClasspath += sourceSets.common.compileClasspath
+        compileClasspath += configurations.compileClasspath
+        runtimeClasspath += sourceSets.common.output
+        runtimeClasspath += sourceSets.server.output
+        runtimeClasspath += sourceSets.common.runtimeClasspath
+        runtimeClasspath += configurations.runtimeClasspath
+        runtimeClasspath += configurations.serverCompileClasspath
     }
 }
 
