@@ -12,7 +12,7 @@ java {
 }
 
 group = 'com.akeyless'
-version = '1.0.2'
+version = '1.1.0'
 
 repositories {
     mavenCentral()
@@ -109,6 +109,18 @@ sourceSets {
         runtimeClasspath += sourceSets.common.runtimeClasspath
         runtimeClasspath += configurations.runtimeClasspath
     }
+    test {
+        compileClasspath += sourceSets.common.output
+        compileClasspath += sourceSets.server.output
+        compileClasspath += configurations.serverCompileClasspath
+        compileClasspath += sourceSets.common.compileClasspath
+        compileClasspath += configurations.compileClasspath
+        runtimeClasspath += sourceSets.common.output
+        runtimeClasspath += sourceSets.server.output
+        runtimeClasspath += sourceSets.common.runtimeClasspath
+        runtimeClasspath += configurations.runtimeClasspath
+        runtimeClasspath += configurations.serverCompileClasspath
+    }
 }
 
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
@@ -131,11 +143,19 @@ task serverJar(type: Jar) {
     dependsOn classes
 }
 
-task agentZip(type: Zip) {
+task agentJar(type: Jar) {
     archiveBaseName.set('akeyless-agent')
     from sourceSets.agent.output
     from sourceSets.common.output
     dependsOn classes
+}
+
+task agentZip(type: Zip) {
+    archiveBaseName.set('akeyless-agent')
+    into('lib') {
+        from agentJar
+    }
+    dependsOn agentJar
 }
 
 task pluginZip(type: Zip) {

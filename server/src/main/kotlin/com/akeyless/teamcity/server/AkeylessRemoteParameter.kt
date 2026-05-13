@@ -3,6 +3,7 @@ package com.akeyless.teamcity.server
 import com.akeyless.teamcity.common.AkeylessConstants
 import jetbrains.buildServer.serverSide.Parameter
 import jetbrains.buildServer.serverSide.SBuild
+import jetbrains.buildServer.serverSide.SProjectFeatureDescriptor
 import jetbrains.buildServer.serverSide.oauth.OAuthConstants
 import jetbrains.buildServer.serverSide.parameters.remote.RemoteParameter
 import jetbrains.buildServer.serverSide.parameters.remote.RemoteParameterProvider
@@ -25,28 +26,30 @@ class AkeylessRemoteParameter : RemoteParameterProvider {
         var secretValue = parameter.value
 
         if (project != null && secretValue.startsWith(AKEYLESS_PREFIX)) {
-            val secretPath = secretValue.substringAfter(AKEYLESS_PREFIX)
-            if (secretPath.isBlank()) {
+            val parsed = parseReference(secretValue)
+            if (parsed.secretPath.isBlank()) {
                 logger.warn("Akeyless: empty secret path in parameter '${parameter.name}'")
             } else {
-                val connectionFeature = try {
+                val connections = try {
                     project.getAvailableFeaturesOfType(OAuthConstants.FEATURE_TYPE)
-                        .firstOrNull { it.parameters[OAuthConstants.OAUTH_TYPE_PARAM] == AkeylessConstants.PLUGIN_ID }
+                        .filter { it.parameters[OAuthConstants.OAUTH_TYPE_PARAM] == AkeylessConstants.PLUGIN_ID }
                 } catch (e: Exception) {
                     logger.warn("Could not access Akeyless connections", e)
-                    null
+                    emptyList()
                 }
 
-                if (connectionFeature != null) {
-                    val apiUrl = connectionFeature.parameters["apiUrl"] ?: AkeylessConstants.DEFAULT_API_URL
-                    val authMethod = connectionFeature.parameters["authMethod"] ?: AkeylessConstants.AUTH_METHOD_ACCESS_KEY
-                    val authConfig = extractAuthConfig(connectionFeature.parameters, authMethod)
+                val connection = findConnection(connections, parsed.connectionId)
+
+                if (connection != null) {
+                    val apiUrl = connection.parameters["apiUrl"] ?: AkeylessConstants.DEFAULT_API_URL
+                    val authMethod = connection.parameters["authMethod"] ?: AkeylessConstants.AUTH_METHOD_ACCESS_KEY
+                    val authConfig = extractAuthConfig(connection.parameters, authMethod)
 
                     try {
                         val connector = AkeylessConnector(apiUrl, authMethod, authConfig)
                         val token = connector.authenticate()
                         if (token != null) {
-                            val resolved = connector.resolveSecret(secretPath, token)
+                            val resolved = connector.resolveSecret(parsed.secretPath, token)
                             if (resolved != null) {
                                 secretValue = resolved
                             } else {
@@ -58,6 +61,8 @@ class AkeylessRemoteParameter : RemoteParameterProvider {
                     } catch (e: Exception) {
                         logger.error("Error resolving Akeyless secret for parameter '${parameter.name}'", e)
                     }
+                } else {
+                    logger.warn("Akeyless: no matching connection found for parameter '${parameter.name}'")
                 }
             }
         }
@@ -68,6 +73,34 @@ class AkeylessRemoteParameter : RemoteParameterProvider {
             override fun getValue(): String = finalValue
             override fun isSecret(): Boolean = true
             override fun getName(): String = paramName
+        }
+    }
+
+    private data class ParsedRef(val connectionId: String?, val secretPath: String)
+
+    private fun parseReference(value: String): ParsedRef {
+        val afterPrefix = value.substringAfter(AKEYLESS_PREFIX)
+        if (afterPrefix.startsWith("/")) {
+            return ParsedRef(null, afterPrefix)
+        }
+        val colonIdx = afterPrefix.indexOf(':')
+        if (colonIdx > 0 && colonIdx < afterPrefix.length - 1) {
+            return ParsedRef(afterPrefix.substring(0, colonIdx), afterPrefix.substring(colonIdx + 1))
+        }
+        return ParsedRef(null, afterPrefix)
+    }
+
+    private fun findConnection(
+        connections: List<SProjectFeatureDescriptor>,
+        connectionId: String?
+    ): SProjectFeatureDescriptor? {
+        if (connectionId == null) {
+            return connections.firstOrNull()
+        }
+        return connections.firstOrNull {
+            it.parameters["connectionId"] == connectionId
+        } ?: connections.firstOrNull {
+            it.parameters["displayName"] == connectionId
         }
     }
 

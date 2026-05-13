@@ -13,6 +13,10 @@ class AkeylessOAuthProvider(
 
     private val logger = Loggers.SERVER
 
+    companion object {
+        private val COMMON_KEYS = setOf("accessId", "apiUrl", "authMethod", "displayName", "connectionId")
+    }
+
     override fun getType(): String = AkeylessConstants.PLUGIN_ID
 
     override fun getDisplayName(): String = AkeylessConstants.PLUGIN_NAME
@@ -20,7 +24,9 @@ class AkeylessOAuthProvider(
     override fun describeConnection(connection: OAuthConnectionDescriptor): String {
         val apiUrl = connection.parameters["apiUrl"] ?: AkeylessConstants.DEFAULT_API_URL
         val authMethod = connection.parameters["authMethod"] ?: AkeylessConstants.AUTH_METHOD_ACCESS_KEY
-        return "Akeyless at $apiUrl ($authMethod)"
+        val connId = connection.parameters["connectionId"]
+        val idSuffix = if (!connId.isNullOrBlank()) ", id=$connId" else ""
+        return "Akeyless at $apiUrl ($authMethod$idSuffix)"
     }
 
     override fun getDefaultProperties(): Map<String, String> {
@@ -48,7 +54,7 @@ class AkeylessOAuthProvider(
 
                 when (authMethod) {
                     AkeylessConstants.AUTH_METHOD_ACCESS_KEY -> {
-                        removeUnusedAuthProperties(properties, setOf("accessId", "accessKey", "apiUrl", "authMethod", "displayName"))
+                        removeUnusedAuthProperties(properties, COMMON_KEYS + "accessKey")
                         if (properties["accessId"].isNullOrBlank()) {
                             errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
                         }
@@ -57,7 +63,7 @@ class AkeylessOAuthProvider(
                         }
                     }
                     AkeylessConstants.AUTH_METHOD_K8S -> {
-                        removeUnusedAuthProperties(properties, setOf("accessId", "k8sAuthConfigName", "apiUrl", "authMethod", "displayName"))
+                        removeUnusedAuthProperties(properties, COMMON_KEYS + "k8sAuthConfigName")
                         if (properties["accessId"].isNullOrBlank()) {
                             errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
                         }
@@ -65,26 +71,16 @@ class AkeylessOAuthProvider(
                             errors.add(InvalidProperty("k8sAuthConfigName", "K8s Auth Config Name should not be empty"))
                         }
                     }
-                    AkeylessConstants.AUTH_METHOD_AWS_IAM -> {
-                        removeUnusedAuthProperties(properties, setOf("accessId", "apiUrl", "authMethod", "displayName"))
-                        if (properties["accessId"].isNullOrBlank()) {
-                            errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
-                        }
-                    }
-                    AkeylessConstants.AUTH_METHOD_AZURE_AD -> {
-                        removeUnusedAuthProperties(properties, setOf("accessId", "apiUrl", "authMethod", "displayName"))
-                        if (properties["accessId"].isNullOrBlank()) {
-                            errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
-                        }
-                    }
+                    AkeylessConstants.AUTH_METHOD_AWS_IAM,
+                    AkeylessConstants.AUTH_METHOD_AZURE_AD,
                     AkeylessConstants.AUTH_METHOD_GCP -> {
-                        removeUnusedAuthProperties(properties, setOf("accessId", "apiUrl", "authMethod", "displayName"))
+                        removeUnusedAuthProperties(properties, COMMON_KEYS)
                         if (properties["accessId"].isNullOrBlank()) {
                             errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
                         }
                     }
                     AkeylessConstants.AUTH_METHOD_CERT -> {
-                        removeUnusedAuthProperties(properties, setOf("accessId", "certData", "certFile", "apiUrl", "authMethod", "displayName"))
+                        removeUnusedAuthProperties(properties, COMMON_KEYS + setOf("certData", "certFile"))
                         if (properties["accessId"].isNullOrBlank()) {
                             errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
                         }

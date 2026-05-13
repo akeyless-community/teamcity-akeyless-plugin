@@ -4,11 +4,58 @@
 
 <jsp:useBean id="propertiesBean" type="jetbrains.buildServer.serverSide.oauth.OAuthConnectionBean" scope="request" />
 
+<bs:linkScript>
+    /js/bs/testConnection.js
+</bs:linkScript>
 <style type="text/css">
 .auth-container {
     display: none;
 }
 </style>
+<script>
+    BS.OAuthConnectionDialog.submitTestConnection = function() {
+        var that = this;
+        BS.PasswordFormSaver.save(this, '<c:url value="/admin/akeyless-test-connection.html"/>', OO.extend(BS.ErrorsAwareListener, {
+            onFailedTestConnectionError: function(elem) {
+                var text = "";
+                if (elem.firstChild) {
+                    text = elem.firstChild.nodeValue;
+                }
+                BS.TestConnectionDialog.show(false, text, $('akeylessTestConnectionButton'));
+            },
+
+            onCompleteSave: function(form, responseXML) {
+                var err = BS.XMLResponse.processErrors(responseXML, this, form.propertiesErrorsHandler);
+                BS.ErrorsAwareListener.onCompleteSave(form, responseXML, err);
+                if (!err) {
+                    this.onSuccessfulSave(responseXML);
+                }
+            },
+
+            onSuccessfulSave: function(responseXML) {
+                that.enable();
+
+                var additionalInfo = "";
+                var testConnectionResultNodes = responseXML.documentElement.getElementsByTagName("testConnectionResult");
+                if (testConnectionResultNodes && testConnectionResultNodes.length > 0) {
+                    var testConnectionResult = testConnectionResultNodes.item(0);
+                    if (testConnectionResult.firstChild) {
+                        additionalInfo = testConnectionResult.firstChild.nodeValue;
+                    }
+                }
+
+                BS.TestConnectionDialog.show(true, additionalInfo, $('akeylessTestConnectionButton'));
+            }
+        }));
+        return false;
+    };
+
+    var afterClose = BS.OAuthConnectionDialog.afterClose;
+    BS.OAuthConnectionDialog.afterClose = function() {
+        $j('#OAuthConnectionDialog .testConnectionButton').remove();
+        afterClose();
+    };
+</script>
 
 <tr>
     <td><label for="displayName">Display name:</label><l:star/></td>
@@ -16,6 +63,15 @@
         <props:textProperty name="displayName" className="longField"/>
         <span class="smallNote">The display name of the connection</span>
         <span class="error" id="error_displayName"></span>
+    </td>
+</tr>
+
+<tr>
+    <td><label for="connectionId">Connection ID:</label></td>
+    <td>
+        <props:textProperty name="connectionId" className="longField"/>
+        <span class="smallNote">Optional short identifier. Use in build parameters to select this connection (e.g. <code>akeyless:myid:/path/to/secret</code>)</span>
+        <span class="error" id="error_connectionId"></span>
     </td>
 </tr>
 
@@ -110,7 +166,15 @@
     </td>
 </tr>
 
+<forms:button id="akeylessTestConnectionButton" className="testConnectionButton"
+              onclick="return BS.OAuthConnectionDialog.submitTestConnection();">Test Connection</forms:button>
+<bs:dialog dialogId="testConnectionDialog" title="Test Connection" closeCommand="BS.TestConnectionDialog.close();" closeAttrs="showdiscardchangesmessage='false'">
+    <div id="testConnectionStatus"></div>
+    <div id="testConnectionDetails" class="mono"></div>
+</bs:dialog>
 <script type="text/javascript">
+    $j('#OAuthConnectionDialog .popupSaveButtonsBlock .testConnectionButton').remove();
+    $j("#akeylessTestConnectionButton").appendTo($j('#OAuthConnectionDialog .popupSaveButtonsBlock')[0]);
     BS.Akeyless = {
         onAuthChange: function(element) {
             $j('.auth-container').hide();

@@ -14,4 +14,6 @@ object AkeylessConstants {
     const val AUTH_METHOD_CERT = "cert"
 
     const val PARAM_TYPE_AKEYLESS = "akeyless"
+
+    const val RESOLVED_PARAMS_KEY = "teamcity.akeyless.resolved.params"
 }
