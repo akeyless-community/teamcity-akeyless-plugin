@@ -14,7 +14,9 @@ class AkeylessOAuthProvider(
     private val logger = Loggers.SERVER
 
     companion object {
-        private val COMMON_KEYS = setOf("accessId", "apiUrl", "authMethod", "displayName", "connectionId")
+        private val ALL_AKEYLESS_AUTH_KEYS = setOf(
+            "accessKey", "k8sAuthConfigName", "certData", "certFile", "jwtTokenParam"
+        )
     }
 
     override fun getType(): String = AkeylessConstants.PLUGIN_ID
@@ -54,7 +56,7 @@ class AkeylessOAuthProvider(
 
                 when (authMethod) {
                     AkeylessConstants.AUTH_METHOD_ACCESS_KEY -> {
-                        removeUnusedAuthProperties(properties, COMMON_KEYS + "accessKey")
+                        removeUnusedAuthProperties(properties, setOf("accessKey"))
                         if (properties["accessId"].isNullOrBlank()) {
                             errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
                         }
@@ -63,7 +65,7 @@ class AkeylessOAuthProvider(
                         }
                     }
                     AkeylessConstants.AUTH_METHOD_K8S -> {
-                        removeUnusedAuthProperties(properties, COMMON_KEYS + "k8sAuthConfigName")
+                        removeUnusedAuthProperties(properties, setOf("k8sAuthConfigName"))
                         if (properties["accessId"].isNullOrBlank()) {
                             errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
                         }
@@ -74,13 +76,13 @@ class AkeylessOAuthProvider(
                     AkeylessConstants.AUTH_METHOD_AWS_IAM,
                     AkeylessConstants.AUTH_METHOD_AZURE_AD,
                     AkeylessConstants.AUTH_METHOD_GCP -> {
-                        removeUnusedAuthProperties(properties, COMMON_KEYS)
+                        removeUnusedAuthProperties(properties, emptySet())
                         if (properties["accessId"].isNullOrBlank()) {
                             errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
                         }
                     }
                     AkeylessConstants.AUTH_METHOD_CERT -> {
-                        removeUnusedAuthProperties(properties, COMMON_KEYS + setOf("certData", "certFile"))
+                        removeUnusedAuthProperties(properties, setOf("certData", "certFile"))
                         if (properties["accessId"].isNullOrBlank()) {
                             errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
                         }
@@ -88,13 +90,23 @@ class AkeylessOAuthProvider(
                             errors.add(InvalidProperty("certData", "Either Certificate Data or Certificate File Path must be provided"))
                         }
                     }
+                    AkeylessConstants.AUTH_METHOD_JWT -> {
+                        removeUnusedAuthProperties(properties, setOf("jwtTokenParam"))
+                        if (properties["accessId"].isNullOrBlank()) {
+                            errors.add(InvalidProperty("accessId", "Access ID should not be empty"))
+                        }
+                    }
                 }
 
                 return errors
             }
 
+            /**
+             * Removes only Akeyless-specific auth properties that are not relevant
+             * to the selected auth method. Preserves all TeamCity internal properties.
+             */
             private fun removeUnusedAuthProperties(properties: MutableMap<String, String>, keysToKeep: Set<String>) {
-                val keysToRemove = properties.keys.filter { it !in keysToKeep }
+                val keysToRemove = ALL_AKEYLESS_AUTH_KEYS - keysToKeep
                 keysToRemove.forEach { properties.remove(it) }
             }
         }

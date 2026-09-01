@@ -12,6 +12,7 @@ object AkeylessConstants {
     const val AUTH_METHOD_AZURE_AD = "azure_ad"
     const val AUTH_METHOD_GCP = "gcp"
     const val AUTH_METHOD_CERT = "cert"
+    const val AUTH_METHOD_JWT = "jwt"
 
     const val PARAM_TYPE_AKEYLESS = "akeyless"
 

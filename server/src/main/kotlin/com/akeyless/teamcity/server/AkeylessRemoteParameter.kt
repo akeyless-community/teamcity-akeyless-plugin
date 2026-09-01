@@ -105,20 +105,6 @@ class AkeylessRemoteParameter : RemoteParameterProvider {
     }
 
     private fun extractAuthConfig(properties: Map<String, String>, authMethod: String): Map<String, String> {
-        val authConfig = mutableMapOf<String, String>()
-        properties["accessId"]?.let { authConfig["accessId"] = it }
-
-        when (authMethod) {
-            AkeylessConstants.AUTH_METHOD_ACCESS_KEY -> {
-                properties["accessKey"]?.let { authConfig["accessKey"] = it }
-            }
-            AkeylessConstants.AUTH_METHOD_K8S -> {
-                properties["k8sAuthConfigName"]?.let { authConfig["k8sAuthConfigName"] = it }
-            }
-            AkeylessConstants.AUTH_METHOD_CERT -> {
-                properties["certData"]?.let { authConfig["certData"] = it }
-            }
-        }
-        return authConfig
+        return AkeylessBuildStartProcessor.extractAuthConfig(properties, authMethod)
     }
 }

@@ -68,6 +68,11 @@ class AkeylessTestConnectionController(
                 }
                 authConfig["certData"] = certData
             }
+            AkeylessConstants.AUTH_METHOD_JWT -> {
+                XmlResponseUtil.writeTestResult(xmlResponse,
+                    "JWT/OIDC configuration saved. Authentication will be tested at build time using the token from the OIDC/JWT build feature.")
+                return
+            }
         }
 
         try {

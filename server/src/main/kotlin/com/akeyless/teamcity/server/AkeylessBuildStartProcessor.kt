@@ -51,6 +51,9 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor, PasswordsProvide
                 AkeylessConstants.AUTH_METHOD_CERT -> {
                     properties["certData"]?.let { authConfig["certData"] = it }
                 }
+                AkeylessConstants.AUTH_METHOD_JWT -> {
+                    properties["jwtTokenParam"]?.let { authConfig["jwtTokenParam"] = it }
+                }
             }
             return authConfig
         }
@@ -105,7 +108,23 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor, PasswordsProvide
 
             val apiUrl = connection.parameters["apiUrl"] ?: AkeylessConstants.DEFAULT_API_URL
             val authMethod = connection.parameters["authMethod"] ?: AkeylessConstants.AUTH_METHOD_ACCESS_KEY
-            val authConfig = extractAuthConfig(connection.parameters, authMethod)
+            val authConfig = extractAuthConfig(connection.parameters, authMethod).toMutableMap()
+
+            if (authMethod == AkeylessConstants.AUTH_METHOD_JWT) {
+                val jwtParamName = authConfig.remove("jwtTokenParam") ?: ""
+                if (jwtParamName.isBlank()) {
+                    errors.add("Akeyless: JWT Token Parameter is not configured on connection '${connId ?: "default"}'")
+                    continue
+                }
+                val jwtValue = allParams[jwtParamName]
+                    ?: allParams["env.$jwtParamName"]
+                    ?: allParams["system.$jwtParamName"]
+                if (jwtValue.isNullOrBlank()) {
+                    errors.add("Akeyless: JWT token parameter '$jwtParamName' is empty or not set. Is the OIDC/JWT build feature enabled?")
+                    continue
+                }
+                authConfig["jwt"] = jwtValue
+            }
 
             val connector = AkeylessConnector(apiUrl, authMethod, authConfig)
             val token = try {

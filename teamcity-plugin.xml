@@ -4,7 +4,7 @@
     <info>
         <name>Akeyless Secrets Management</name>
         <display-name>Akeyless Secrets Management</display-name>
-        <version>1.1.0</version>
+        <version>1.2.0</version>
         <description>
             Integrate Akeyless secrets management platform with TeamCity.
             Retrieve secrets from Akeyless during builds without storing sensitive data in TeamCity.
@@ -35,6 +35,10 @@
 
     <change-notes>
         <![CDATA[
+        <b>1.2.0</b>
+        <ul>
+            <li>Add JWT/OIDC authentication for credential-less builds using TeamCity OIDC JWT plugin</li>
+        </ul>
         <b>1.1.0</b>
         <ul>
             <li>Add Test Connection button to verify credentials from the connection dialog</li>

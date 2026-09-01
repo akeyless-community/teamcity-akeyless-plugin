@@ -3,7 +3,6 @@ package com.akeyless.teamcity.server
 import com.akeyless.teamcity.common.AkeylessConstants
 import io.akeyless.client.ApiClient
 import io.akeyless.client.ApiException
-import io.akeyless.client.Configuration
 import io.akeyless.client.api.V2Api
 import io.akeyless.client.model.Auth
 import io.akeyless.client.model.DescribeItem
@@ -24,8 +23,8 @@ class AkeylessConnector(
 
     init {
         validateApiUrl(apiUrl)
-        val client: ApiClient = Configuration.getDefaultApiClient()
-        client.basePath = apiUrl.trimEnd('/')
+        val client = ApiClient()
+        client.basePath = normalizeApiUrl(apiUrl)
         api = V2Api(client)
     }
 
@@ -58,6 +57,10 @@ class AkeylessConnector(
                 AkeylessConstants.AUTH_METHOD_CERT -> {
                     authConfig["accessId"]?.let { auth.accessId(it) }
                     authConfig["certData"]?.let { auth.certData(it) }
+                }
+                AkeylessConstants.AUTH_METHOD_JWT -> {
+                    authConfig["accessId"]?.let { auth.accessId(it) }
+                    authConfig["jwt"]?.let { auth.jwt(it) }
                 }
             }
 
@@ -187,6 +190,10 @@ class AkeylessConnector(
     }
 
     companion object {
+        fun normalizeApiUrl(url: String): String {
+            return url.trimEnd('/')
+        }
+
         fun validateApiUrl(url: String) {
             val trimmed = url.trimEnd('/')
             val uri = try {

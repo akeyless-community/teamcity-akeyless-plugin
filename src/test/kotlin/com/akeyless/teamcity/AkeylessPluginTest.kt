@@ -154,6 +154,34 @@ class AkeylessPluginTest {
     // API URL validation
     // ---------------------------------------------------------------
 
+    // ---------------------------------------------------------------
+    // API URL normalization
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `normalizeApiUrl - preserves gateway URL with api v2 path`() {
+        assertEquals("https://my-gw:8000/api/v2", AkeylessConnector.normalizeApiUrl("https://my-gw:8000/api/v2"))
+    }
+
+    @Test
+    fun `normalizeApiUrl - preserves clean URL`() {
+        assertEquals("https://api.akeyless.io", AkeylessConnector.normalizeApiUrl("https://api.akeyless.io"))
+    }
+
+    @Test
+    fun `normalizeApiUrl - strips trailing slash only`() {
+        assertEquals("https://api.akeyless.io", AkeylessConnector.normalizeApiUrl("https://api.akeyless.io/"))
+    }
+
+    @Test
+    fun `normalizeApiUrl - strips trailing slash from gateway path`() {
+        assertEquals("https://my-gw:8000/api/v2", AkeylessConnector.normalizeApiUrl("https://my-gw:8000/api/v2/"))
+    }
+
+    // ---------------------------------------------------------------
+    // API URL validation
+    // ---------------------------------------------------------------
+
     @Test
     fun `validateApiUrl - valid HTTPS URL passes`() {
         AkeylessConnector.validateApiUrl("https://api.akeyless.io")
@@ -239,6 +267,43 @@ class AkeylessPluginTest {
     }
 
     // ---------------------------------------------------------------
+    // JWT auth config extraction
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `extractAuthConfig - JWT method extracts accessId and jwtTokenParam`() {
+        val props = mapOf(
+            "accessId" to "p-jwt-123",
+            "jwtTokenParam" to "env.TEAMCITY_BUILD_OIDC_TOKEN",
+            "accessKey" to "should-be-ignored"
+        )
+        val config = AkeylessBuildStartProcessor.extractAuthConfig(props, AkeylessConstants.AUTH_METHOD_JWT)
+        assertEquals("p-jwt-123", config["accessId"])
+        assertEquals("env.TEAMCITY_BUILD_OIDC_TOKEN", config["jwtTokenParam"])
+        assertNull(config["accessKey"])
+        assertEquals(2, config.size)
+    }
+
+    @Test
+    fun `extractAuthConfig - JWT with missing jwtTokenParam only has accessId`() {
+        val props = mapOf("accessId" to "p-jwt-456")
+        val config = AkeylessBuildStartProcessor.extractAuthConfig(props, AkeylessConstants.AUTH_METHOD_JWT)
+        assertEquals("p-jwt-456", config["accessId"])
+        assertNull(config["jwtTokenParam"])
+        assertEquals(1, config.size)
+    }
+
+    @Test
+    fun `extractAuthConfig - JWT with custom param name`() {
+        val props = mapOf(
+            "accessId" to "p-jwt",
+            "jwtTokenParam" to "jwt.token"
+        )
+        val config = AkeylessBuildStartProcessor.extractAuthConfig(props, AkeylessConstants.AUTH_METHOD_JWT)
+        assertEquals("jwt.token", config["jwtTokenParam"])
+    }
+
+    // ---------------------------------------------------------------
     // Constants sanity checks
     // ---------------------------------------------------------------
 
@@ -250,7 +315,8 @@ class AkeylessPluginTest {
             AkeylessConstants.AUTH_METHOD_AWS_IAM,
             AkeylessConstants.AUTH_METHOD_AZURE_AD,
             AkeylessConstants.AUTH_METHOD_GCP,
-            AkeylessConstants.AUTH_METHOD_CERT
+            AkeylessConstants.AUTH_METHOD_CERT,
+            AkeylessConstants.AUTH_METHOD_JWT
         )
         assertEquals(methods.size, methods.toSet().size, "Auth method constants must be unique")
     }

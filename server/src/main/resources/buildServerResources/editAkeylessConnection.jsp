@@ -123,6 +123,11 @@
 
         <props:radioButtonProperty name="authMethod" value="cert" id="auth_cert" onclick="BS.Akeyless.onAuthChange(this)"/>
         <label for="auth_cert">Certificate</label>
+
+        <br/>
+
+        <props:radioButtonProperty name="authMethod" value="jwt" id="auth_jwt" onclick="BS.Akeyless.onAuthChange(this)"/>
+        <label for="auth_jwt">JWT / OIDC</label>
     </td>
 </tr>
 
@@ -146,6 +151,16 @@
 </tr>
 
 <%-- AWS IAM, Azure AD, GCP: no additional fields needed --%>
+
+<%-- JWT / OIDC Authentication --%>
+<tr class="noBorder auth-container auth-jwt">
+    <td><label for="jwtTokenParam">JWT Token Parameter:</label></td>
+    <td>
+        <props:textProperty name="jwtTokenParam" className="longField"/>
+        <span class="smallNote">Build parameter that holds the JWT token (e.g. <code>jwt.token</code> or <code>env.TEAMCITY_BUILD_OIDC_TOKEN</code>). Requires the TeamCity OIDC/JWT plugin.</span>
+        <span class="error" id="error_jwtTokenParam"></span>
+    </td>
+</tr>
 
 <%-- Certificate Authentication --%>
 <tr class="auth-container auth-cert">
