@@ -12,9 +12,21 @@ import jetbrains.buildServer.serverSide.SRunningBuild
 import jetbrains.buildServer.serverSide.SimpleParameter
 import jetbrains.buildServer.serverSide.oauth.OAuthConstants
 import jetbrains.buildServer.serverSide.parameters.types.PasswordsProvider
+import jetbrains.buildServer.util.positioning.PositionAware
+import jetbrains.buildServer.util.positioning.PositionConstraint
 import java.util.concurrent.ConcurrentHashMap
 
-class AkeylessBuildStartProcessor : BuildStartContextProcessor, PasswordsProvider {
+
+open class AkeylessBuildStartProcessor(
+    private val jwtOnly: Boolean = false
+) : BuildStartContextProcessor, PasswordsProvider, PositionAware {
+
+    override fun getOrderId(): String = javaClass.name
+
+    override fun getConstraint(): PositionConstraint =
+        PositionConstraint.before(
+            "jetbrains.buildServer.serverSide.parameters.types.PasswordsBuildStartContextProcessor"
+        )
 
     private val logger = Loggers.SERVER
 
@@ -75,8 +87,8 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor, PasswordsProvide
         if (akeylessConnections.isEmpty()) return
 
         val allParams = mutableMapOf<String, String>()
-        allParams.putAll(context.sharedParameters)
         allParams.putAll(build.buildOwnParameters)
+        allParams.putAll(context.sharedParameters)
 
         val akeylessRefs = allParams.filter { it.value.startsWith(AKEYLESS_PREFIX) }
         if (akeylessRefs.isEmpty()) return
@@ -108,21 +120,28 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor, PasswordsProvide
 
             val apiUrl = connection.parameters["apiUrl"] ?: AkeylessConstants.DEFAULT_API_URL
             val authMethod = connection.parameters["authMethod"] ?: AkeylessConstants.AUTH_METHOD_ACCESS_KEY
+            
+            val isJwt = authMethod == AkeylessConstants.AUTH_METHOD_JWT
+            if (isJwt != jwtOnly) continue
+
             val authConfig = extractAuthConfig(connection.parameters, authMethod).toMutableMap()
 
-            if (authMethod == AkeylessConstants.AUTH_METHOD_JWT) {
+            if (isJwt) {
                 val jwtParamName = authConfig.remove("jwtTokenParam") ?: ""
                 if (jwtParamName.isBlank()) {
                     errors.add("Akeyless: JWT Token Parameter is not configured on connection '${connId ?: "default"}'")
                     continue
                 }
+
                 val jwtValue = allParams[jwtParamName]
                     ?: allParams["env.$jwtParamName"]
                     ?: allParams["system.$jwtParamName"]
+
                 if (jwtValue.isNullOrBlank()) {
                     errors.add("Akeyless: JWT token parameter '$jwtParamName' is empty or not set. Is the OIDC/JWT build feature enabled?")
                     continue
                 }
+
                 authConfig["jwt"] = jwtValue
             }
 
@@ -180,8 +199,20 @@ class AkeylessBuildStartProcessor : BuildStartContextProcessor, PasswordsProvide
 
         if (passwordParams.isNotEmpty()) {
             resolvedSecrets[build.buildId] = passwordParams
-            val resolvedNames = passwordParams.map { it.name }.joinToString(",")
-            context.addSharedParameter(AkeylessConstants.RESOLVED_PARAMS_KEY, resolvedNames)
+
+            val resolvedNames = linkedSetOf<String>()
+
+            context.sharedParameters[AkeylessConstants.RESOLVED_PARAMS_KEY]
+                ?.split(",")
+                ?.filter { it.isNotBlank() }
+                ?.let { resolvedNames.addAll(it) }
+
+            resolvedNames.addAll(passwordParams.map { it.name })
+
+            context.addSharedParameter(
+                AkeylessConstants.RESOLVED_PARAMS_KEY,
+                resolvedNames.joinToString(",")
+            )
         }
     }
 
