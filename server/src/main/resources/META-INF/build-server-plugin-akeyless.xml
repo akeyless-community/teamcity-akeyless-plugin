@@ -9,6 +9,7 @@
     <bean id="akeylessParameterProvider" class="com.akeyless.teamcity.server.AkeylessParameterProvider"/>
     <bean id="akeylessRemoteParameter" class="com.akeyless.teamcity.server.AkeylessRemoteParameter"/>
     <bean id="akeylessBuildStartProcessor" class="com.akeyless.teamcity.server.AkeylessBuildStartProcessor"/>
+    <bean id="akeylessJwtBuildStartProcessor" class="com.akeyless.teamcity.server.AkeylessJwtBuildStartProcessor"/>
     <bean id="akeylessTestConnectionController" class="com.akeyless.teamcity.server.AkeylessTestConnectionController"/>
 
 </beans>
